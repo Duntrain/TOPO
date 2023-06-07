@@ -1,4 +1,4 @@
-# Optimizing NOTEARS Objectives via Topological Swaps
+# Optimizing NOTEARS Objectives via Topological Swaps <img src="https://github.com/Duntrain/TOPO/assets/6846921/fa8812bc-b295-4200-9ce0-4c267aafc9ce" width="5%" height="5%">
 
 This is an implementation of the following paper:
 
