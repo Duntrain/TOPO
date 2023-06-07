@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.linear_model import LinearRegression, Lasso, LassoLars
 import scipy.linalg as slin
 from copy import copy
-
+import torch
 def threshold_W(W, threshold=0.3):
     """
     :param W: adjacent matrix
@@ -388,3 +388,24 @@ def create_new_topo_greedy(topo,loss_collections,idx_set,loss,opt = 1):
         if succ:
             topo = create_new_topo(topo= topo,idx =(i,j),opt = opt)
     return topo
+
+def gradient_l1(W, A, lambda1):
+    grad = np.zeros_like(W)
+    pos_W = W > 0
+    neg_W = W < 0
+    zero_W = ~np.logical_or(pos_W, neg_W)
+    grad[pos_W] = lambda1
+    grad[neg_W] = (-lambda1)
+    pos_A = A > lambda1
+    neg_A = A < -lambda1
+    zero_A = ~np.logical_or(pos_A, neg_A)
+    grad[zero_W & pos_A] = (-lambda1)
+    grad[zero_W & neg_A] = lambda1
+    grad[zero_W & zero_A] = 0
+
+    return grad
+
+def squared_loss(output, target):
+    n = target.shape[0]
+    loss = 0.5 / n * torch.sum((output - target) ** 2)
+    return loss
