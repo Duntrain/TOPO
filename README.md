@@ -32,7 +32,7 @@ In this paper, we propose a bi-level algorithm that solve a class of non-convex 
 - `python-igraph`
 - `torch`: Only used for nonlinear 
 - `scikit-learn`
-- `scipy`
+
 
 ## Contents 
 
