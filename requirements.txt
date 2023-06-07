@@ -1,0 +1,5 @@
+numpy
+scipy
+python-igraph
+torch
+scikit-learn
