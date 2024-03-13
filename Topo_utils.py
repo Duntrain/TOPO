@@ -197,62 +197,82 @@ def find_common(indx1, indx2):
     B = list(zip(indx2[:, 0], indx2[:, 1]))
     return set(A).intersection(B)
 
+def find_hgrad_index_updated(G_h, Z, thres=1e-2):
+    TRUE_positions = np.where(np.logical_and(G_h<= thres, Z))
+    positions_list = list(zip(TRUE_positions[0], TRUE_positions[1]))
+    return positions_list
 
-def find_idx_set(G_h, G_loss, Z, size_small, size_large):
-    r"""
-    Implement Algorithm 2 in Paper, find
+def find_idx_set_updated(G_h,G_loss,Z,size_small,size_large):
+    d = Z.shape[0]
+    Zc = np.array(Z).copy()
+    np.fill_diagonal(Zc,False) # don't consider the diagonal element
+    assert size_large <= d*(d-1)/2 , "please set correct size for large search space, it must be less than d(d-1)/2"
+    assert size_small>=1, "please set correct size for small search space"
+    values = G_h[Zc]
+    values.sort()
+    g_h_thre_small = values[(size_small-1)]
+    g_h_thre_large = values[(size_large-1)]
+    index_set_small = find_hgrad_index_updated(G_h,Zc,thres= g_h_thre_small)
+    index_set_large = find_hgrad_index_updated(G_h,Zc,thres= g_h_thre_large)
+    return index_set_small,index_set_large
 
-    index_set_small = \mathcal{Y}(W,\tau_*,\xi^*) s.t. |index_set_small| = size1
-    index_set_large = \mathcal{Y}(W,\tau^*,\xi_*) s.t. |index_set_large| = size2
 
-    :param G_h: gradient of h
-    :param G_loss: gradient of loss
-    :param Z: edge absence constraints
-    :param size1: size of \mathcal{Y}(W,\tau_*,\xi^*)
-    :param size2: size of \mathcal{Y}(W,\tau^*,\xi_*)
-    :return: index_set_small, index_set_large
-    """
-    gFs = [0]
-    # gFs =  [0, 1e-8, 1e-6, 1e-4, 1e-2, 2e-2, 3e-2, 4e-2, 5e-2, 6e-2, 7e-2, 8e-2, 9e-2, 1e-1, 1,2,3,4]
-    # gFs = [0, 1e-8, 1e-6, 1e-4, 1e-2, 2e-2, 3e-2, 4e-2, 5e-2, 6e-2, 7e-2, 8e-2, 9e-2, 1e-1, 1,2,3,4,5,6,7,8,9,10,15,20,25,30,40,50]
-    ghs = sorted([40, 30, 20, 10, 5, 2, 1, 0.5, 0.1, 0.09, 0.08, 0.07, 0.06, 0.05, 0.045, 0.04,
-                  0.03, 0.025, 0.02, 0.01, 0.005, 0.001, 0.0001, 0.00005, 1e-5, 8e-6, 6e-6, 4e-6, 2e-6, 1e-6, 1e-7, 0])
 
-    M = np.zeros([len(ghs), len(gFs)])
-    for count_gF, gF in enumerate(gFs):
-        for count_gh, gh in enumerate(ghs):
-            indx1 = find_hgrad_index(G_h, Z=Z, thres=gh)
-            # find where {(i,j)|Z[i,j]=FALSE,[\nabla F(W)]_{ij} not =0}
-            indx2 = find_Fgrad_index(G_loss, Z=Z, thres=gF)
-            index_set = find_common(indx1, indx2)
-            M[count_gh, count_gF] = len(index_set)
+# def find_idx_set(G_h, G_loss, Z, size_small, size_large):
+#     r"""
+#     Implement Algorithm 2 in Paper, find
 
-    i1, j1 = np.unravel_index(np.argmin(np.abs(M - size_small), axis=None), M.shape)
-    i2, j2 = np.unravel_index(np.argmin(np.abs(M - size_large), axis=None), M.shape)
+#     index_set_small = \mathcal{Y}(W,\tau_*,\xi^*) s.t. |index_set_small| = size1
+#     index_set_large = \mathcal{Y}(W,\tau^*,\xi_*) s.t. |index_set_large| = size2
 
-    indx1_small = find_hgrad_index(G_h, Z=Z, thres=ghs[i1])
-    # find where {(i,j)|Z[i,j]=FALSE,[\nabla F(W)]_{ij} not =0}
-    indx2_small = find_Fgrad_index(G_loss, Z=Z, thres=gFs[j1])
-    index_set_small = find_common(indx1_small, indx2_small)
+#     :param G_h: gradient of h
+#     :param G_loss: gradient of loss
+#     :param Z: edge absence constraints
+#     :param size1: size of \mathcal{Y}(W,\tau_*,\xi^*)
+#     :param size2: size of \mathcal{Y}(W,\tau^*,\xi_*)
+#     :return: index_set_small, index_set_large
+#     """
+#     gFs = [0]
+#     # gFs =  [0, 1e-8, 1e-6, 1e-4, 1e-2, 2e-2, 3e-2, 4e-2, 5e-2, 6e-2, 7e-2, 8e-2, 9e-2, 1e-1, 1,2,3,4]
+#     # gFs = [0, 1e-8, 1e-6, 1e-4, 1e-2, 2e-2, 3e-2, 4e-2, 5e-2, 6e-2, 7e-2, 8e-2, 9e-2, 1e-1, 1,2,3,4,5,6,7,8,9,10,15,20,25,30,40,50]
+#     ghs = sorted([40, 30, 20, 10, 5, 2, 1, 0.5, 0.1, 0.09, 0.08, 0.07, 0.06, 0.05, 0.045, 0.04,
+#                   0.03, 0.025, 0.02, 0.01, 0.005, 0.001, 0.0001, 0.00005, 1e-5, 8e-6, 6e-6, 4e-6, 2e-6, 1e-6, 1e-7, 0])
 
-    if len(index_set_small) > size_small + 20 and ghs[i1] == 0:
-        size1_th_largest = np.partition(np.abs(G_loss[(indx1_small[:, 0], indx1_small[:, 1])]), -1 * size_small)[-1 * size_small]
-        indx2_small_v = find_Fgrad_index(G_loss, Z=Z, thres=size1_th_largest)
-        index_set_small = find_common(indx1_small, indx2_small_v)
+#     M = np.zeros([len(ghs), len(gFs)])
+#     for count_gF, gF in enumerate(gFs):
+#         for count_gh, gh in enumerate(ghs):
+#             indx1 = find_hgrad_index(G_h, Z=Z, thres=gh)
+#             # find where {(i,j)|Z[i,j]=FALSE,[\nabla F(W)]_{ij} not =0}
+#             indx2 = find_Fgrad_index(G_loss, Z=Z, thres=gF)
+#             index_set = find_common(indx1, indx2)
+#             M[count_gh, count_gF] = len(index_set)
 
-    indx1_large = find_hgrad_index(G_h, Z=Z, thres=ghs[i2])
-    # find where {(i,j)|Z[i,j]=FALSE,[\nabla F(W)]_{ij} not =0}
-    indx2_large = find_Fgrad_index(G_loss, Z=Z, thres=gFs[j2])
-    index_set_large = find_common(indx1_large, indx2_large)
+#     i1, j1 = np.unravel_index(np.argmin(np.abs(M - size_small), axis=None), M.shape)
+#     i2, j2 = np.unravel_index(np.argmin(np.abs(M - size_large), axis=None), M.shape)
 
-    if len(index_set_large) < (size_large - 100):
-        indx2_large = find_Fgrad_index(G_loss, Z=Z, thres=0)
-        size2 = min(size_large, len(indx2_large))
-        size2_th_smallest = np.partition(G_h[(indx2_large[:, 0], indx2_large[:, 1])], size2 - 2)[size2 - 2]
-        indx1_large_v = find_hgrad_index(G_h, Z=Z, thres=size2_th_smallest)
-        index_set_large = find_common(indx1_large_v, indx2_large)
+#     indx1_small = find_hgrad_index(G_h, Z=Z, thres=ghs[i1])
+#     # find where {(i,j)|Z[i,j]=FALSE,[\nabla F(W)]_{ij} not =0}
+#     indx2_small = find_Fgrad_index(G_loss, Z=Z, thres=gFs[j1])
+#     index_set_small = find_common(indx1_small, indx2_small)
 
-    return index_set_small, index_set_large
+#     if len(index_set_small) > size_small + 20 and ghs[i1] == 0:
+#         size1_th_largest = np.partition(np.abs(G_loss[(indx1_small[:, 0], indx1_small[:, 1])]), -1 * size_small)[-1 * size_small]
+#         indx2_small_v = find_Fgrad_index(G_loss, Z=Z, thres=size1_th_largest)
+#         index_set_small = find_common(indx1_small, indx2_small_v)
+
+#     indx1_large = find_hgrad_index(G_h, Z=Z, thres=ghs[i2])
+#     # find where {(i,j)|Z[i,j]=FALSE,[\nabla F(W)]_{ij} not =0}
+#     indx2_large = find_Fgrad_index(G_loss, Z=Z, thres=gFs[j2])
+#     index_set_large = find_common(indx1_large, indx2_large)
+
+#     if len(index_set_large) < (size_large - 100):
+#         indx2_large = find_Fgrad_index(G_loss, Z=Z, thres=0)
+#         size2 = min(size_large, len(indx2_large))
+#         size2_th_smallest = np.partition(G_h[(indx2_large[:, 0], indx2_large[:, 1])], size2 - 2)[size2 - 2]
+#         indx1_large_v = find_hgrad_index(G_h, Z=Z, thres=size2_th_smallest)
+#         index_set_large = find_common(indx1_large_v, indx2_large)
+
+#     return index_set_small, index_set_large
 
 
 def init_Wstar_slice(X, index_y, index_x, tau=0, method="Linear"):

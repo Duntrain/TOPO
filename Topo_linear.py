@@ -1,5 +1,5 @@
 # %%
-from Topo_utils import threshold_W, create_Z, find_idx_set, create_new_topo, create_new_topo_greedy,gradient_l1
+from Topo_utils import threshold_W, create_Z, create_new_topo, create_new_topo_greedy,find_idx_set_updated,gradient_l1
 import numpy as np
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from scipy.special import expit as sigmoid
@@ -79,7 +79,7 @@ class TOPO_linear:
         self.W = self._init_W(self.Z)
         loss, G_loss = self.score(X=self.X, W=self.W)
         h, G_h = self._h(W=self.W)
-        idx_set_small, idx_set_large = find_idx_set(G_h=G_h, G_loss=G_loss, Z=self.Z, size_small=size_small,
+        idx_set_small, idx_set_large = find_idx_set_updated(G_h=G_h, G_loss=G_loss, Z=self.Z, size_small=size_small,
                                                     size_large=size_large)
         idx_set = list(idx_set_small)
         while bool(idx_set):
@@ -97,8 +97,7 @@ class TOPO_linear:
 
             else:
                 if large_space_used < no_large_search:
-                    idx_set = idx_set_large.difference(idx_set_small)
-                    idx_set = list(idx_set)
+                    idx_set = list(set(idx_set_large) - set(idx_set_small))
                     idx_len = len(idx_set)
                     loss_collections = np.zeros(idx_len)
                     for i in range(idx_len):
@@ -123,7 +122,7 @@ class TOPO_linear:
             self.W = self._init_W(self.Z)
             loss, G_loss = self.score(X=self.X, W=self.W)
             h, G_h = self._h(W=self.W)
-            idx_set_small, idx_set_large = find_idx_set(G_h=G_h, G_loss=G_loss, Z=self.Z, size_small=size_small,
+            idx_set_small, idx_set_large = find_idx_set_updated(G_h=G_h, G_loss=G_loss, Z=self.Z, size_small=size_small,
                                                         size_large=size_large)
             idx_set = list(idx_set_small)
 
@@ -136,18 +135,21 @@ if __name__ == '__main__':
     import utils
     from timeit import default_timer as timer
 
-    rd_int = int(np.random.randint(10000, size=1))
+    rd_int = np.random.randint(10000, size=1)[0]
 
     print(rd_int)
 
     utils.set_random_seed(rd_int)
-    n, d, s0 = 1000, 50, 200
+    n, d, s0 = 1000, 30, 120
     graph_type, sem_type = 'ER', 'gauss'
 
     B_true = utils.simulate_dag(d, s0, graph_type)
     W_true = utils.simulate_parameter(B_true)
     X = utils.simulate_linear_sem(W_true, n, sem_type)
 
+    size_small = 100
+    size_large = 400
+    no_large_search = 1
 
     ## Linear Model
     def regress(X, y):
@@ -164,11 +166,6 @@ if __name__ == '__main__':
 
         return loss, G_loss
     
-
-
-    
-
-
 
 
     '''
@@ -196,13 +193,11 @@ if __name__ == '__main__':
         return loss, G_loss
     '''
 
-    
-
 
     model = TOPO_linear(regress=regress, score=score)
     topo_init = list(np.random.permutation(range(d)))
     start = timer()
-    W_est, _, _, _ = model.fit(X=X, topo=topo_init, no_large_search=10, size_small=100, size_large=1000)
+    W_est, _, _, _ = model.fit(X=X, topo=topo_init, no_large_search=no_large_search, size_small=size_small, size_large=size_large)
     end = timer()
     acc = utils.count_accuracy(B_true, threshold_W(W=W_est) != 0)
     print(acc)

@@ -37,20 +37,29 @@ In this paper, we propose a bi-level algorithm that solve a class of non-convex 
 ## Contents 
 
 - `Topo_linear.py` - implementation of TOPO for linear models (also support Logistic losses).
-- `Topo_nonlinear.py` - implementation of TOPO for nonlinear models (__The code for nonlinear case is coming soon__)
+- `Topo_nonlinear.py` - implementation of TOPO for nonlinear models.
 - `Topo_utils` - implementation of support function for TOPO.
 - `utils.py` - graph simulation, data simulation, and accuracy evaluation.
 
 ## Running TOPO
 
 Use `requirements.txt` to install the dependencies (recommended to use virtualenv or conda).
-The simplest way to try out DAGMA is to run a simple example:
+The simplest way to try out TOPO is to run a simple (linear) example:
 ```bash
 $ git clone https://github.com/Duntrain/TOPO.git
 $ cd TOPO/
 $ pip3 install -r requirements.txt
 $ python3 Topo_linear.py
 ```
+
+or a simple (nonlinear) example. you can replace `PRINT_ENABLED = True` to `PRINT_ENABLED = False` in script to suppress the printing of intermediate results.
+```bash
+$ git clone https://github.com/Duntrain/TOPO.git
+$ cd TOPO/
+$ pip3 install -r requirements.txt
+$ python3 Topo_nonlinear.py
+```
+
 
 The above runs the TOPO on a randomly generated 20-node Erdos-Renyi graph with 1000 samples. 
 The output should look like the below:
