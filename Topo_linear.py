@@ -6,7 +6,6 @@ from scipy.special import expit as sigmoid
 import scipy.linalg as slin
 from copy import copy
 
-
 class TOPO_linear:
     def __init__(self, score, regress):
         super().__init__()
