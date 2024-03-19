@@ -7,7 +7,7 @@ import numpy as np
 from copy import copy
 import scipy.linalg as slin
 import torch.nn.functional as F
-from Topo_utils import create_Z,create_new_topo,threshold_W,find_idx_set_updated
+from topo_utils import create_Z,create_new_topo,threshold_W,find_idx_set_updated
 import utils
 
 def conditional_print(*args, **kwargs):
