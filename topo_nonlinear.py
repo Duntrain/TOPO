@@ -1,20 +1,13 @@
 import time
 import torch.optim.lr_scheduler
-
 import torch
 import torch.nn as nn
 import numpy as np
 from copy import copy
 import scipy.linalg as slin
 import torch.nn.functional as F
-from topo_utils import create_Z,create_new_topo,threshold_W,find_idx_set_updated
+from topo_utils import create_Z,create_new_topo,threshold_W,find_idx_set_updated,set_sizes_nonlinear
 import utils
-
-def conditional_print(*args, **kwargs):
-        """Prints only if PRINT_ENABLED is True."""
-        if PRINT_ENABLED:
-            print(*args, **kwargs)
-
 
 
 class TopoMLP(nn.Module):
@@ -237,25 +230,6 @@ class TOPO_Nonlinear:
                 scheduler.step()
 
         return loss
-
-
-    # def _loss(self, model):
-    #     with torch.no_grad():
-    #         X_hat = model(self.X_torch)
-    #         if self.loss_type == 'l2':
-    #             loss = self.squared_loss(X_hat, self.X_torch)
-    #         elif self.loss_type == 'logl2':
-    #             loss = self.log_loss(X_hat, self.X_torch)
-    #     return loss.item()
-
-    
-    
-
-    # @staticmethod
-    # def check_gradient_info(model):
-    #     for name, param in model.named_parameters():
-    #         print(f"{name}: requires_grad={param.requires_grad}, shape={param.shape}")
-
     @staticmethod
     def copy_model(model, model_clone):
         model_clone.load_state_dict(model.state_dict())
@@ -268,11 +242,14 @@ class TOPO_Nonlinear:
         return model_clone
     def fit(self,
             topo: list,
-            no_large_search,
-            size_small,
-            size_large,
+            no_large_search = -1,
+            size_small = -1,
+            size_large = -1,
+            verbose = False
             ):
-
+        vprint = print if verbose else lambda *a, **k: None
+        size_small, size_large, no_large_search = set_sizes_nonlinear(d, size_small, size_large, no_large_search)
+        print(f"Parameter is automatically set up.\n size_small: {size_small}, size_large: {size_large}, no_large_search: {no_large_search}")
         iter_count = 0
         large_space_used = 0
         if not isinstance(topo, list):
@@ -283,7 +260,7 @@ class TOPO_Nonlinear:
         # training model according to initial topological sort.
         self.model.reset_by_topo(topo = self.topo)
         self.loss = self.train(model = self.model)
-        conditional_print(f"The initial model, current loss {self.loss}")
+        vprint(f"The initial model, current loss {self.loss}")
         self.W_adj = self.model.layer0_to_adj()
         self.h, self.G_h = self.model._h(W=self.W_adj)
         # let gradient of F play no role in update
@@ -306,14 +283,14 @@ class TOPO_Nonlinear:
             
                 loss_clone = self.train(model = model_clone)
 
-                conditional_print(f"working with topological sort:{topo_clone}, current loss {loss_clone}")
+                vprint(f"working with topological sort:{topo_clone}, current loss {loss_clone}")
 
                 model_clone.reset_by_topo(topo = topo_clone)
 
                 if loss_clone<self.loss:
                     indicator_improve = True
                     # model_clone is successful, and we get copy of it
-                    conditional_print(f"better loss found, topological sort: {topo_clone}, and loss: {loss_clone}")
+                    vprint(f"better loss found, topological sort: {topo_clone}, and loss: {loss_clone}")
                     self.model = self.copy_model(model = model_clone, model_clone = self.model)
                     self.topo = topo_clone
                     self.Z = create_Z(topo_clone)
@@ -326,7 +303,7 @@ class TOPO_Nonlinear:
                 if large_space_used < no_large_search:
                     indicator_improve_large = False
                     # print('++++++++++++++++++++++++++++++++++++++++++++')
-                    conditional_print(f"start to use large search space for {large_space_used + 1} times")
+                    vprint(f"start to use large search space for {large_space_used + 1} times")
                     # print('++++++++++++++++++++++++++++++++++++++++++++')
                     idx_set = list(set(idx_set_large) - set(idx_set_small))
                     idx_len = len(idx_set)
@@ -337,7 +314,7 @@ class TOPO_Nonlinear:
                         model_clone.update_nn_by_topo(topo=self.topo, index=idx_set[i])
                         
                         loss_clone = self.train(model=model_clone)
-                        conditional_print(f"working with topological sort:{topo_clone}, current loss {loss_clone}")
+                        vprint(f"working with topological sort:{topo_clone}, current loss {loss_clone}")
                         model_clone.reset_by_topo(topo=topo_clone)
 
 
@@ -349,15 +326,15 @@ class TOPO_Nonlinear:
                             self.loss = loss_clone
                             self.W_adj = self.model.layer0_to_adj()
                             self.h, self.G_h = self.model._h(W=self.W_adj)
-                            conditional_print(f"better loss found, topological sort: {topo_clone}, and loss: {loss_clone}")
+                            vprint(f"better loss found, topological sort: {topo_clone}, and loss: {loss_clone}")
                              
                             break
                     if not indicator_improve_large:
-                        conditional_print("Using larger search space, but we cannot find better loss")
+                        vprint("Using larger search space, but we cannot find better loss")
                         break
                     large_space_used =large_space_used+ 1 
                 else:
-                    conditional_print("We reach the number of chances to search large space, it is {}".format(
+                    vprint("We reach the number of chances to search large space, it is {}".format(
                         no_large_search))
                     break
 
@@ -375,7 +352,6 @@ class TOPO_Nonlinear:
 if __name__ == '__main__':
     torch.set_default_dtype(torch.double)
     np.set_printoptions(precision=3)
-    rd_int = int(np.random.randint(10000, size=1)[0])
     rd_int = 4321
     utils.set_random_seed(rd_int)
     torch.manual_seed(rd_int)
@@ -386,14 +362,8 @@ if __name__ == '__main__':
     X = utils.simulate_nonlinear_sem(B_true, n, sem_type)
     topo_random = list(np.random.permutation(range(d)))
     
-    # Whether to print the intermediate results
-    PRINT_ENABLED = True # you can set it to False to suppress the intermediate results
-
     # set up the model
     dims = [d, 40, 1]
-    no_large_search = 1
-    size_small = 10
-    size_large = 40
     learning_rate = None 
     num_iter = 1e4
     lambda1 = 0.01,
@@ -401,19 +371,18 @@ if __name__ == '__main__':
     loss_type = 'l2'
     opti = 'LBFGS' # 'Adam'
     lr_decay = True
+    verbose = True
 
     Topo_mlp = TopoMLP(dims = dims)
     Topo_nonlinear = TOPO_Nonlinear(X = X, model = Topo_mlp,num_iter = num_iter,
                                     lambda1 = lambda1,lambda2 = lambda2,loss_type = loss_type,
                                     opti = opti, lr_decay = lr_decay)
     time_start = time.time()
-    W,topo,loss, model = Topo_nonlinear.fit(topo = topo_random, size_large = size_large,size_small = size_small,
-                       no_large_search = no_large_search)
+    W,topo,loss, model = Topo_nonlinear.fit(topo = topo_random,verbose= verbose)
     time_end = time.time()
     
     W_thres = threshold_W(W,threshold= 0.5)
     acc = utils.count_accuracy(B_true, W_thres != 0)
     print(acc)
     print(f"running time is {time_end - time_start}")
-    print("...")
 

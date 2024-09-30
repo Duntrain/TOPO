@@ -3,6 +3,24 @@ from sklearn.linear_model import LinearRegression, Lasso, LassoLars
 import scipy.linalg as slin
 from copy import copy
 import torch
+import math
+def set_sizes_nonlinear(d, size_small=-1, size_large=-1, no_large_search=-1):
+    if size_small == -1:
+        size_small = int(d)
+    if size_large == -1:
+        size_large = min(int(3*d), int(d*(d-1)/2))
+    if no_large_search == -1:
+        no_large_search = min(math.ceil(d/20),1)
+    return size_small, size_large, no_large_search
+
+def set_sizes_linear(d, size_small = -1, size_large = -1, no_large_search = -1):
+    if size_small == -1:
+        size_small = min(int(1.5*d),min(int(math.sqrt(d)*(d-1)*math.log(d,10)),int(d*(d-1)/2)))
+    if size_large == -1:
+        size_large = max(int(1.5*d), min(int(math.sqrt(d)*(d-1)*math.log(d,10)),int(d*(d-1)/2)))
+    if no_large_search == -1:
+        no_large_search = min(int(d/10),1)
+    return size_small, size_large, no_large_search
 
 def threshold_W(W, threshold=0.3):
     """
@@ -216,65 +234,6 @@ def find_idx_set_updated(G_h,G_loss,Z,size_small,size_large):
     index_set_small = find_hgrad_index_updated(G_h,Zc,thres= g_h_thre_small)
     index_set_large = find_hgrad_index_updated(G_h,Zc,thres= g_h_thre_large)
     return index_set_small,index_set_large
-
-
-
-# def find_idx_set(G_h, G_loss, Z, size_small, size_large):
-#     r"""
-#     Implement Algorithm 2 in Paper, find
-
-#     index_set_small = \mathcal{Y}(W,\tau_*,\xi^*) s.t. |index_set_small| = size1
-#     index_set_large = \mathcal{Y}(W,\tau^*,\xi_*) s.t. |index_set_large| = size2
-
-#     :param G_h: gradient of h
-#     :param G_loss: gradient of loss
-#     :param Z: edge absence constraints
-#     :param size1: size of \mathcal{Y}(W,\tau_*,\xi^*)
-#     :param size2: size of \mathcal{Y}(W,\tau^*,\xi_*)
-#     :return: index_set_small, index_set_large
-#     """
-#     gFs = [0]
-#     # gFs =  [0, 1e-8, 1e-6, 1e-4, 1e-2, 2e-2, 3e-2, 4e-2, 5e-2, 6e-2, 7e-2, 8e-2, 9e-2, 1e-1, 1,2,3,4]
-#     # gFs = [0, 1e-8, 1e-6, 1e-4, 1e-2, 2e-2, 3e-2, 4e-2, 5e-2, 6e-2, 7e-2, 8e-2, 9e-2, 1e-1, 1,2,3,4,5,6,7,8,9,10,15,20,25,30,40,50]
-#     ghs = sorted([40, 30, 20, 10, 5, 2, 1, 0.5, 0.1, 0.09, 0.08, 0.07, 0.06, 0.05, 0.045, 0.04,
-#                   0.03, 0.025, 0.02, 0.01, 0.005, 0.001, 0.0001, 0.00005, 1e-5, 8e-6, 6e-6, 4e-6, 2e-6, 1e-6, 1e-7, 0])
-
-#     M = np.zeros([len(ghs), len(gFs)])
-#     for count_gF, gF in enumerate(gFs):
-#         for count_gh, gh in enumerate(ghs):
-#             indx1 = find_hgrad_index(G_h, Z=Z, thres=gh)
-#             # find where {(i,j)|Z[i,j]=FALSE,[\nabla F(W)]_{ij} not =0}
-#             indx2 = find_Fgrad_index(G_loss, Z=Z, thres=gF)
-#             index_set = find_common(indx1, indx2)
-#             M[count_gh, count_gF] = len(index_set)
-
-#     i1, j1 = np.unravel_index(np.argmin(np.abs(M - size_small), axis=None), M.shape)
-#     i2, j2 = np.unravel_index(np.argmin(np.abs(M - size_large), axis=None), M.shape)
-
-#     indx1_small = find_hgrad_index(G_h, Z=Z, thres=ghs[i1])
-#     # find where {(i,j)|Z[i,j]=FALSE,[\nabla F(W)]_{ij} not =0}
-#     indx2_small = find_Fgrad_index(G_loss, Z=Z, thres=gFs[j1])
-#     index_set_small = find_common(indx1_small, indx2_small)
-
-#     if len(index_set_small) > size_small + 20 and ghs[i1] == 0:
-#         size1_th_largest = np.partition(np.abs(G_loss[(indx1_small[:, 0], indx1_small[:, 1])]), -1 * size_small)[-1 * size_small]
-#         indx2_small_v = find_Fgrad_index(G_loss, Z=Z, thres=size1_th_largest)
-#         index_set_small = find_common(indx1_small, indx2_small_v)
-
-#     indx1_large = find_hgrad_index(G_h, Z=Z, thres=ghs[i2])
-#     # find where {(i,j)|Z[i,j]=FALSE,[\nabla F(W)]_{ij} not =0}
-#     indx2_large = find_Fgrad_index(G_loss, Z=Z, thres=gFs[j2])
-#     index_set_large = find_common(indx1_large, indx2_large)
-
-#     if len(index_set_large) < (size_large - 100):
-#         indx2_large = find_Fgrad_index(G_loss, Z=Z, thres=0)
-#         size2 = min(size_large, len(indx2_large))
-#         size2_th_smallest = np.partition(G_h[(indx2_large[:, 0], indx2_large[:, 1])], size2 - 2)[size2 - 2]
-#         indx1_large_v = find_hgrad_index(G_h, Z=Z, thres=size2_th_smallest)
-#         index_set_large = find_common(indx1_large_v, indx2_large)
-
-#     return index_set_small, index_set_large
-
 
 def init_Wstar_slice(X, index_y, index_x, tau=0, method="Linear"):
     if method == 'Lasso':

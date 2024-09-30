@@ -1,5 +1,4 @@
-# %%
-from topo_utils import threshold_W, create_Z, create_new_topo, create_new_topo_greedy,find_idx_set_updated,gradient_l1
+from topo_utils import threshold_W, create_Z, create_new_topo, create_new_topo_greedy,find_idx_set_updated,gradient_l1,set_sizes_linear
 import numpy as np
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from scipy.special import expit as sigmoid
@@ -63,7 +62,10 @@ class TOPO_linear:
 
 
 
-    def fit(self, X, topo: list, no_large_search, size_small, size_large):
+    def fit(self, X, topo: list, no_large_search = -1, size_small = -1, size_large = -1, verbose = False):
+        vprint = print if verbose else lambda *a, **k: None
+        size_small, size_large, no_large_search = set_sizes_linear(d, size_small, size_large, no_large_search)
+        print(f"Parameter is automatically set up.\n size_small: {size_small}, size_large: {size_large}, no_large_search: {no_large_search}")
         self.n, self.d = X.shape
         self.X = X
         iter_count = 0
@@ -77,6 +79,7 @@ class TOPO_linear:
         self.Z = Z
         self.W = self._init_W(self.Z)
         loss, G_loss = self.score(X=self.X, W=self.W)
+        vprint(f"Initial loss: {loss}")
         h, G_h = self._h(W=self.W)
         idx_set_small, idx_set_large = find_idx_set_updated(G_h=G_h, G_loss=G_loss, Z=self.Z, size_small=size_small,
                                                     size_large=size_large)
@@ -92,10 +95,13 @@ class TOPO_linear:
                 loss_collections[i] = loss_c
 
             if np.any(loss > np.min(loss_collections)):
+                vprint(f"current loss : {loss} and find better loss in small space")
                 self.topo = create_new_topo_greedy(self.topo,loss_collections,idx_set,loss)
 
             else:
                 if large_space_used < no_large_search:
+                    vprint(f"current loss : {loss} and cannot find better loss in small space")
+                    vprint(f"Using larger search space for {large_space_used+1} times")
                     idx_set = list(set(idx_set_large) - set(idx_set_small))
                     idx_len = len(idx_set)
                     loss_collections = np.zeros(idx_len)
@@ -107,13 +113,14 @@ class TOPO_linear:
                     if np.any(loss > loss_collections):
                         large_space_used += 1
                         self.topo = create_new_topo_greedy(self.topo, loss_collections, idx_set, loss)
+                        vprint(f"current loss : {loss} and find better loss in large space")
                     else:
-                        print("Using larger search space, but we cannot find better loss")
+                        vprint("Using larger search space, but we cannot find better loss")
                         break
 
 
                 else:
-                    print("We reach the number of chances to search large space, it is {}".format(
+                    vprint("We reach the number of chances to search large space, it is {}".format(
                         no_large_search))
                     break
 
@@ -135,20 +142,16 @@ if __name__ == '__main__':
     from timeit import default_timer as timer
 
     rd_int = np.random.randint(10000, size=1)[0]
-
-    print(rd_int)
+    print(f"random seed: {rd_int}")
 
     utils.set_random_seed(rd_int)
-    n, d, s0 = 1000, 30, 120
+    n, d, s0 = 1000, 10, 20
     graph_type, sem_type = 'ER', 'gauss'
+    verbose = False
 
     B_true = utils.simulate_dag(d, s0, graph_type)
     W_true = utils.simulate_parameter(B_true)
     X = utils.simulate_linear_sem(W_true, n, sem_type)
-
-    size_small = 100
-    size_large = 400
-    no_large_search = 1
 
     ## Linear Model
     def regress(X, y):
@@ -191,12 +194,10 @@ if __name__ == '__main__':
         G_loss = G_loss1 + gradient_l1(W, G_loss1, lambda1)
         return loss, G_loss
     '''
-
-
     model = TOPO_linear(regress=regress, score=score)
     topo_init = list(np.random.permutation(range(d)))
     start = timer()
-    W_est, _, _, _ = model.fit(X=X, topo=topo_init, no_large_search=no_large_search, size_small=size_small, size_large=size_large)
+    W_est, _, _, _ = model.fit(X = X, topo = topo_init, verbose= verbose)
     end = timer()
     acc = utils.count_accuracy(B_true, threshold_W(W=W_est) != 0)
     print(acc)
